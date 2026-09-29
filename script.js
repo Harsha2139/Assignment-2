@@ -7,8 +7,8 @@
 // 1. SUPABASE CONFIGURATION
 // =========================================================
 
-const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
-const SUPABASE_KEY = "YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY";
+const SUPABASE_URL = "https://zhivpgaqtfknvckupmdh.supabase.co";
+const SUPABASE_KEY = "sb_publishable_YOndHkKaFkGDsnT9W5j-mw_FS7PKzrN";
 
 const hasSupabaseConfig =
     window.supabase &&
