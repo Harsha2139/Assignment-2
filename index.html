@@ -1,319 +1,1122 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#1769ff">
-    <title>PayFlow Pro — Digital Payments</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>PayFlow Pro</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
+
 <body>
 
-<div class="app-shell">
+  <!-- =====================================================
+       TOAST
+  ====================================================== -->
+  <div id="toast" class="toast"></div>
 
-    <aside class="sidebar" id="sidebar">
-        <div class="brand">
-            <div class="brand-mark">P</div>
-            <div>
-                <strong>PayFlow</strong>
-                <span>Digital Payments</span>
-            </div>
+
+  <!-- =====================================================
+       MOBILE OVERLAY
+       IMPORTANT: unique ID
+  ====================================================== -->
+  <div id="mobileOverlay" class="mobile-overlay"></div>
+
+
+  <!-- =====================================================
+       MAIN APPLICATION
+       Hidden until user is authenticated
+  ====================================================== -->
+  <div id="app" class="app logged-out">
+
+
+    <!-- ===================================================
+         SIDEBAR
+    ==================================================== -->
+    <aside id="sidebar" class="sidebar">
+
+      <div class="brand">
+
+        <div class="brand-logo">
+          P
         </div>
 
-        <nav class="side-nav">
-            <button class="nav-item active" data-view="dashboardView">
-                <span>⌂</span><span>Dashboard</span>
-            </button>
-            <button class="nav-item" data-view="transactionsView">
-                <span>↔</span><span>Transactions</span>
-            </button>
-            <button class="nav-item" data-view="paymentsView">
-                <span>₹</span><span>Send Money</span>
-            </button>
-            <button class="nav-item" data-view="rechargeView">
-                <span>▣</span><span>Recharge</span>
-            </button>
-            <button class="nav-item" data-view="billsView">
-                <span>▤</span><span>Pay Bills</span>
-            </button>
-        </nav>
-
-        <div class="sidebar-bottom">
-            <div class="security-badge">
-                <span class="status-dot"></span>
-                <div>
-                    <strong>Secure mode</strong>
-                    <small>Supabase RLS enabled</small>
-                </div>
-            </div>
-            <button class="nav-item" id="signOutBtn">
-                <span>↪</span><span>Sign out</span>
-            </button>
+        <div>
+          <h1>PayFlow</h1>
+          <span>PRO</span>
         </div>
+
+      </div>
+
+
+      <!-- Navigation -->
+      <nav class="nav">
+
+        <button
+          class="nav-item active"
+          data-page="dashboard"
+          type="button"
+        >
+          <span>⌂</span>
+          Dashboard
+        </button>
+
+
+        <button
+          class="nav-item"
+          data-page="transactions"
+          type="button"
+        >
+          <span>↕</span>
+          Transactions
+        </button>
+
+
+        <button
+          class="nav-item"
+          data-page="send"
+          type="button"
+        >
+          <span>₹</span>
+          Send Money
+        </button>
+
+
+        <button
+          class="nav-item"
+          data-page="recharge"
+          type="button"
+        >
+          <span>◉</span>
+          Mobile Recharge
+        </button>
+
+
+        <button
+          class="nav-item"
+          data-page="bills"
+          type="button"
+        >
+          <span>▣</span>
+          Pay Bills
+        </button>
+
+      </nav>
+
+
+      <!-- Sidebar bottom -->
+      <div class="sidebar-bottom">
+
+        <div class="security-card">
+
+          <div class="security-icon">
+            ✓
+          </div>
+
+          <div>
+            <strong>Secure Wallet</strong>
+            <small>Protected by Supabase</small>
+          </div>
+
+        </div>
+
+
+        <button
+          id="logoutBtn"
+          class="logout-btn"
+          type="button"
+        >
+          ⇥ Sign Out
+        </button>
+
+      </div>
+
     </aside>
 
-    <div class="main-area">
 
-        <header class="topbar">
-            <button class="menu-btn" id="menuBtn" aria-label="Open menu">☰</button>
+    <!-- ===================================================
+         MAIN CONTENT
+    ==================================================== -->
+    <main class="main">
 
-            <div class="topbar-title">
-                <span>Welcome back</span>
-                <h1 id="pageTitle">Dashboard</h1>
+
+      <!-- =================================================
+           TOPBAR
+      ================================================== -->
+      <header class="topbar">
+
+        <div class="top-left">
+
+          <button
+            id="mobileMenu"
+            class="menu-button"
+            type="button"
+            aria-label="Open menu"
+          >
+            ☰
+          </button>
+
+
+          <div>
+
+            <h2 id="pageTitle">
+              Dashboard
+            </h2>
+
+            <p id="pageSubtitle">
+              Welcome back to PayFlow Pro
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div class="top-actions">
+
+          <button
+            id="refreshBtn"
+            class="icon-btn"
+            type="button"
+            title="Refresh"
+          >
+            ↻
+          </button>
+
+
+          <!-- Profile -->
+          <div
+            id="profileChip"
+            class="profile-chip"
+          >
+
+            <div
+              id="topAvatar"
+              class="avatar"
+            >
+              H
             </div>
 
-            <div class="topbar-actions">
-                <button class="icon-btn" id="refreshBtn" title="Refresh">↻</button>
-                <button class="profile-chip" id="profileBtn">
-                    <span class="profile-avatar" id="profileAvatar">H</span>
-                    <span class="profile-copy">
-                        <strong id="profileName">Harsha Reddy</strong>
-                        <small id="profileEmail">harsha@ybl</small>
-                    </span>
+            <div>
+
+              <strong id="topName">
+                User
+              </strong>
+
+              <small>
+                Personal Account
+              </small>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </header>
+
+
+      <!-- =================================================
+           CONTENT
+      ================================================== -->
+      <section class="content">
+
+
+        <!-- =================================================
+             DASHBOARD
+        ================================================== -->
+        <div
+          class="page active"
+          data-page-content="dashboard"
+        >
+
+
+          <!-- Balance -->
+          <div class="hero-card">
+
+            <div>
+
+              <p class="eyebrow">
+                AVAILABLE BALANCE
+              </p>
+
+              <h3 id="balance">
+                ₹0.00
+              </h3>
+
+              <p class="upi-text">
+                UPI ID:
+                <strong id="upiDisplay">
+                  Not available
+                </strong>
+              </p>
+
+            </div>
+
+
+            <div class="wallet-symbol">
+              ₹
+            </div>
+
+          </div>
+
+
+          <!-- Statistics -->
+          <div class="stats-grid">
+
+
+            <div class="stat-card">
+
+              <div class="stat-icon green">
+                ↑
+              </div>
+
+              <div>
+
+                <span>
+                  Total Sent
+                </span>
+
+                <strong id="totalSent">
+                  ₹0.00
+                </strong>
+
+              </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+              <div class="stat-icon blue">
+                ✓
+              </div>
+
+              <div>
+
+                <span>
+                  Successful
+                </span>
+
+                <strong id="successfulCount">
+                  0
+                </strong>
+
+              </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+              <div class="stat-icon orange">
+                ◷
+              </div>
+
+              <div>
+
+                <span>
+                  Pending
+                </span>
+
+                <strong id="pendingCount">
+                  0
+                </strong>
+
+              </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+              <div class="stat-icon red">
+                ×
+              </div>
+
+              <div>
+
+                <span>
+                  Failed
+                </span>
+
+                <strong id="failedCount">
+                  0
+                </strong>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <!-- Dashboard panels -->
+          <div class="dashboard-grid">
+
+
+            <!-- Recent transactions -->
+            <div class="panel">
+
+              <div class="panel-header">
+
+                <div>
+
+                  <h3>
+                    Recent Transactions
+                  </h3>
+
+                  <p>
+                    Your latest payment activity
+                  </p>
+
+                </div>
+
+
+                <button
+                  class="text-btn"
+                  data-page-target="transactions"
+                  type="button"
+                >
+                  View All
                 </button>
+
+              </div>
+
+
+              <div
+                id="recentTransactions"
+                class="transaction-list"
+              >
+
+                <div class="empty-state">
+                  No transactions yet.
+                </div>
+
+              </div>
+
             </div>
-        </header>
 
-        <main class="content">
 
-            <!-- DASHBOARD -->
-            <section class="view active-view" id="dashboardView">
+            <!-- Payment activity -->
+            <div class="panel">
 
-                <section class="hero-card">
-                    <div>
-                        <span class="eyebrow">AVAILABLE BALANCE</span>
-                        <h2 id="balanceAmount">₹67,000.00</h2>
-                        <p id="accountLabel">HDFC Bank •••• 1234</p>
-                        <span class="sync-label" id="syncLabel">Demo data · connect Supabase to sync</span>
-                    </div>
-                    <div class="hero-actions">
-                        <button class="hero-btn" data-open="paymentsView">Send Money</button>
-                        <button class="hero-btn outline" data-open="rechargeView">Recharge</button>
-                    </div>
-                </section>
+              <div class="panel-header">
 
-                <section class="quick-grid">
-                    <button class="quick-card blue" data-open="paymentsView">
-                        <span class="quick-icon">₹</span>
-                        <strong>Send Money</strong>
-                        <small>UPI transfer</small>
-                    </button>
-                    <button class="quick-card green" id="scanBtn">
-                        <span class="quick-icon">⌁</span>
-                        <strong>Scan & Pay</strong>
-                        <small>Pay instantly</small>
-                    </button>
-                    <button class="quick-card blue" data-open="rechargeView">
-                        <span class="quick-icon">▣</span>
-                        <strong>Recharge</strong>
-                        <small>Mobile & plans</small>
-                    </button>
-                    <button class="quick-card green" data-open="billsView">
-                        <span class="quick-icon">▤</span>
-                        <strong>Pay Bills</strong>
-                        <small>Utilities & more</small>
-                    </button>
-                </section>
+                <div>
 
-                <section class="stats-grid">
-                    <article class="stat-card">
-                        <div class="stat-icon blue">↗</div>
-                        <div><span>Total Sent</span><strong id="totalSent">₹0</strong></div>
-                    </article>
-                    <article class="stat-card">
-                        <div class="stat-icon green">✓</div>
-                        <div><span>Successful</span><strong id="successCount">0</strong></div>
-                    </article>
-                    <article class="stat-card">
-                        <div class="stat-icon blue">◷</div>
-                        <div><span>Pending</span><strong id="pendingCount">0</strong></div>
-                    </article>
-                    <article class="stat-card">
-                        <div class="stat-icon green">!</div>
-                        <div><span>Failed</span><strong id="failedCount">0</strong></div>
-                    </article>
-                </section>
+                  <h3>
+                    Payment Activity
+                  </h3>
 
-                <section class="panel">
-                    <div class="panel-head">
-                        <div>
-                            <span class="eyebrow dark">ACTIVITY</span>
-                            <h2>Recent Transactions</h2>
-                            <p>Your latest payment activity</p>
-                        </div>
-                        <button class="secondary-btn" data-open="transactionsView">View All</button>
-                    </div>
-                    <div id="dashboardTransactions" class="transaction-list"></div>
-                </section>
+                  <p>
+                    Recent spending overview
+                  </p>
 
-                <section class="two-col">
-                    <article class="panel">
-                        <div class="panel-head compact">
-                            <div>
-                                <span class="eyebrow dark">MONTHLY FLOW</span>
-                                <h2>Spending overview</h2>
-                            </div>
-                        </div>
-                        <div class="mini-chart" id="miniChart"></div>
-                    </article>
-
-                    <article class="panel">
-                        <div class="panel-head compact">
-                            <div>
-                                <span class="eyebrow dark">SECURITY</span>
-                                <h2>Account protection</h2>
-                            </div>
-                        </div>
-                        <div class="security-list">
-                            <div><span class="check">✓</span><div><strong>Row Level Security</strong><small>Database rows are scoped to your account.</small></div></div>
-                            <div><span class="check">✓</span><div><strong>Session protection</strong><small>Supabase Auth handles browser sessions.</small></div></div>
-                            <div><span class="check">✓</span><div><strong>Safe client key</strong><small>Only the publishable/anon key belongs in the browser.</small></div></div>
-                        </div>
-                    </article>
-                </section>
-            </section>
-
-            <!-- TRANSACTIONS -->
-            <section class="view" id="transactionsView">
-                <div class="page-heading">
-                    <div><span class="eyebrow dark">PAYMENT HISTORY</span><h2>Transactions</h2><p>Search, filter and review your activity.</p></div>
-                    <button class="primary-btn" data-open="paymentsView">+ Send Money</button>
                 </div>
 
-                <section class="panel">
-                    <div class="filters">
-                        <input id="searchInput" type="search" placeholder="Search name, UPI or description...">
-                        <select id="statusFilter">
-                            <option value="all">All Status</option>
-                            <option value="success">Success</option>
-                            <option value="pending">Pending</option>
-                            <option value="failed">Failed</option>
-                        </select>
-                        <select id="typeFilter">
-                            <option value="all">All Types</option>
-                            <option value="upi">UPI</option>
-                            <option value="recharge">Recharge</option>
-                            <option value="bill">Bill</option>
-                        </select>
-                    </div>
-                    <div id="transactionList" class="transaction-list large"></div>
-                </section>
-            </section>
+              </div>
 
-            <!-- SEND MONEY -->
-            <section class="view" id="paymentsView">
-                <div class="page-heading">
-                    <div><span class="eyebrow dark">UPI</span><h2>Send Money</h2><p>Transfer money using a UPI ID.</p></div>
-                    <div class="balance-pill">Balance <strong id="paymentBalance">₹67,000.00</strong></div>
+
+              <div
+                id="chartBars"
+                class="chart"
+              >
+
+                <div class="chart-empty">
+                  No payment data yet
                 </div>
 
-                <section class="form-card">
-                    <form id="paymentForm">
-                        <div class="form-grid">
-                            <label>Receiver UPI ID
-                                <input id="upiInput" type="text" placeholder="example@ybl" required>
-                            </label>
-                            <label>Amount
-                                <div class="amount-wrap"><span>₹</span><input id="amountInput" type="number" min="1" step="0.01" placeholder="0.00" required></div>
-                            </label>
-                            <label class="full">Description
-                                <input id="descriptionInput" type="text" maxlength="120" placeholder="Example: Food payment">
-                            </label>
-                        </div>
-                        <div class="form-footer">
-                            <span>Transactions are recorded in your Supabase database.</span>
-                            <button type="submit" class="primary-btn" id="payBtn">Pay Securely</button>
-                        </div>
-                    </form>
-                </section>
-            </section>
+              </div>
 
-            <!-- RECHARGE -->
-            <section class="view" id="rechargeView">
-                <div class="page-heading">
-                    <div><span class="eyebrow dark">MOBILE</span><h2>Mobile Recharge</h2><p>Recharge your number and keep the transaction history.</p></div>
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- =================================================
+             TRANSACTIONS
+        ================================================== -->
+        <div
+          class="page"
+          data-page-content="transactions"
+        >
+
+          <div class="page-card">
+
+            <div class="panel-header">
+
+              <div>
+
+                <h3>
+                  All Transactions
+                </h3>
+
+                <p>
+                  View and search your payment history
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <div class="filters">
+
+              <input
+                id="searchInput"
+                type="search"
+                placeholder="Search transactions..."
+                autocomplete="off"
+              >
+
+
+              <select id="statusFilter">
+
+                <option value="all">
+                  All Status
+                </option>
+
+                <option value="success">
+                  Success
+                </option>
+
+                <option value="pending">
+                  Pending
+                </option>
+
+                <option value="failed">
+                  Failed
+                </option>
+
+              </select>
+
+
+              <select id="typeFilter">
+
+                <option value="all">
+                  All Types
+                </option>
+
+                <option value="upi">
+                  UPI
+                </option>
+
+                <option value="recharge">
+                  Recharge
+                </option>
+
+                <option value="bill">
+                  Bill
+                </option>
+
+                <option value="merchant">
+                  Merchant
+                </option>
+
+              </select>
+
+            </div>
+
+
+            <div
+              id="allTransactions"
+              class="transaction-list"
+            >
+
+              <div class="empty-state">
+                No transactions yet.
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- =================================================
+             SEND MONEY
+        ================================================== -->
+        <div
+          class="page"
+          data-page-content="send"
+        >
+
+          <div class="form-card">
+
+            <div class="form-heading">
+
+              <div class="big-icon">
+                ₹
+              </div>
+
+              <div>
+
+                <h3>
+                  Send Money
+                </h3>
+
+                <p>
+                  Transfer money using a UPI ID
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <form id="sendForm">
+
+              <label>
+
+                Receiver UPI ID
+
+                <input
+                  id="receiverUpi"
+                  type="text"
+                  placeholder="example@ybl"
+                  autocomplete="off"
+                  required
+                >
+
+              </label>
+
+
+              <label>
+
+                Amount
+
+                <div class="amount-input">
+
+                  <span>
+                    ₹
+                  </span>
+
+                  <input
+                    id="sendAmount"
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    placeholder="0.00"
+                    required
+                  >
+
                 </div>
 
-                <section class="form-card">
-                    <form id="rechargeForm">
-                        <div class="form-grid">
-                            <label>Mobile Number
-                                <input id="mobileInput" type="tel" inputmode="numeric" maxlength="10" placeholder="9876500000" required>
-                            </label>
-                            <label>Operator
-                                <select id="operatorInput" required>
-                                    <option value="">Select Operator</option>
-                                    <option>Jio</option>
-                                    <option>Airtel</option>
-                                    <option>Vi</option>
-                                    <option>BSNL</option>
-                                </select>
-                            </label>
-                            <label>Recharge Amount
-                                <div class="amount-wrap"><span>₹</span><input id="rechargeAmountInput" type="number" min="1" step="1" placeholder="299" required></div>
-                            </label>
-                        </div>
-                        <div class="form-footer">
-                            <span>Demo financial simulation — no real telecom payment is made.</span>
-                            <button type="submit" class="primary-btn" id="rechargeBtn">Recharge Now</button>
-                        </div>
-                    </form>
-                </section>
-            </section>
+              </label>
 
-            <!-- BILLS -->
-            <section class="view" id="billsView">
-                <div class="page-heading">
-                    <div><span class="eyebrow dark">BILL PAYMENTS</span><h2>Pay Bills</h2><p>Choose a utility and record a payment.</p></div>
+
+              <label>
+
+                Description
+
+                <input
+                  id="sendDescription"
+                  type="text"
+                  placeholder="What is this payment for?"
+                  value="UPI Transfer"
+                >
+
+              </label>
+
+
+              <button
+                class="primary-btn"
+                type="submit"
+              >
+                Send Money
+              </button>
+
+            </form>
+
+          </div>
+
+        </div>
+
+
+        <!-- =================================================
+             MOBILE RECHARGE
+        ================================================== -->
+        <div
+          class="page"
+          data-page-content="recharge"
+        >
+
+          <div class="form-card">
+
+            <div class="form-heading">
+
+              <div class="big-icon">
+                ◉
+              </div>
+
+              <div>
+
+                <h3>
+                  Mobile Recharge
+                </h3>
+
+                <p>
+                  Recharge any mobile number
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <form id="rechargeForm">
+
+
+              <label>
+
+                Mobile Number
+
+                <input
+                  id="mobileNumber"
+                  type="tel"
+                  maxlength="10"
+                  inputmode="numeric"
+                  placeholder="10 digit mobile number"
+                  required
+                >
+
+              </label>
+
+
+              <label>
+
+                Operator
+
+                <select
+                  id="operator"
+                  required
+                >
+
+                  <option value="">
+                    Select operator
+                  </option>
+
+                  <option value="Jio">
+                    Jio
+                  </option>
+
+                  <option value="Airtel">
+                    Airtel
+                  </option>
+
+                  <option value="Vi">
+                    Vi
+                  </option>
+
+                  <option value="BSNL">
+                    BSNL
+                  </option>
+
+                </select>
+
+              </label>
+
+
+              <label>
+
+                Recharge Amount
+
+                <div class="amount-input">
+
+                  <span>
+                    ₹
+                  </span>
+
+                  <input
+                    id="rechargeAmount"
+                    type="number"
+                    min="10"
+                    step="1"
+                    placeholder="0"
+                    required
+                  >
+
                 </div>
 
-                <section class="bill-grid">
-                    <button class="bill-card" data-bill="Electricity"><span class="bill-icon">⚡</span><strong>Electricity</strong><small>Pay electricity bill</small></button>
-                    <button class="bill-card" data-bill="Mobile"><span class="bill-icon">▣</span><strong>Mobile</strong><small>Pay mobile bill</small></button>
-                    <button class="bill-card" data-bill="Internet"><span class="bill-icon">◎</span><strong>Internet</strong><small>Pay broadband bill</small></button>
-                    <button class="bill-card" data-bill="Gas"><span class="bill-icon">🔥</span><strong>Gas</strong><small>Pay gas bill</small></button>
-                </section>
+              </label>
 
-                <section class="form-card bill-form-card hidden" id="billFormCard">
-                    <form id="billForm">
-                        <div class="form-grid">
-                            <label>Bill Type<input id="billTypeInput" type="text" readonly></label>
-                            <label>Consumer / Account Number<input id="consumerInput" type="text" placeholder="Enter account number" required></label>
-                            <label>Amount<div class="amount-wrap"><span>₹</span><input id="billAmountInput" type="number" min="1" step="0.01" placeholder="1250" required></div></label>
-                        </div>
-                        <div class="form-footer">
-                            <span>Demo financial simulation — no real bill payment is made.</span>
-                            <button type="submit" class="primary-btn">Pay Bill</button>
-                        </div>
-                    </form>
-                </section>
-            </section>
 
-        </main>
+              <div class="quick-amounts">
+
+                <button
+                  type="button"
+                  data-recharge-amount="199"
+                >
+                  ₹199
+                </button>
+
+                <button
+                  type="button"
+                  data-recharge-amount="299"
+                >
+                  ₹299
+                </button>
+
+                <button
+                  type="button"
+                  data-recharge-amount="399"
+                >
+                  ₹399
+                </button>
+
+                <button
+                  type="button"
+                  data-recharge-amount="499"
+                >
+                  ₹499
+                </button>
+
+              </div>
+
+
+              <button
+                class="primary-btn"
+                type="submit"
+              >
+                Recharge Now
+              </button>
+
+            </form>
+
+          </div>
+
+        </div>
+
+
+        <!-- =================================================
+             BILLS
+        ================================================== -->
+        <div
+          class="page"
+          data-page-content="bills"
+        >
+
+
+          <div class="bill-selection">
+
+            <div>
+
+              <h3>
+                Pay Bills
+              </h3>
+
+              <p>
+                Select a bill category
+              </p>
+
+            </div>
+
+
+            <div class="bill-grid">
+
+
+              <button
+                class="bill-card"
+                data-bill="Electricity"
+                type="button"
+              >
+
+                <span>
+                  ⚡
+                </span>
+
+                <strong>
+                  Electricity
+                </strong>
+
+                <small>
+                  Pay electricity bill
+                </small>
+
+              </button>
+
+
+              <button
+                class="bill-card"
+                data-bill="Water"
+                type="button"
+              >
+
+                <span>
+                  💧
+                </span>
+
+                <strong>
+                  Water
+                </strong>
+
+                <small>
+                  Pay water bill
+                </small>
+
+              </button>
+
+
+              <button
+                class="bill-card"
+                data-bill="DTH"
+                type="button"
+              >
+
+                <span>
+                  📺
+                </span>
+
+                <strong>
+                  DTH
+                </strong>
+
+                <small>
+                  Recharge DTH
+                </small>
+
+              </button>
+
+
+              <button
+                class="bill-card"
+                data-bill="Internet"
+                type="button"
+              >
+
+                <span>
+                  🌐
+                </span>
+
+                <strong>
+                  Internet
+                </strong>
+
+                <small>
+                  Pay broadband bill
+                </small>
+
+              </button>
+
+
+            </div>
+
+          </div>
+
+
+          <!-- Bill form -->
+          <div
+            id="billFormWrap"
+            class="form-card hidden"
+          >
+
+            <div class="form-heading">
+
+              <div class="big-icon">
+                ▣
+              </div>
+
+              <div>
+
+                <h3 id="billTitle">
+                  Pay Bill
+                </h3>
+
+                <p>
+                  Enter your account information
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <form id="billForm">
+
+
+              <input
+                id="billType"
+                type="hidden"
+              >
+
+
+              <label>
+
+                Account / Consumer Number
+
+                <input
+                  id="billAccount"
+                  type="text"
+                  placeholder="Enter account number"
+                  autocomplete="off"
+                  required
+                >
+
+              </label>
+
+
+              <label>
+
+                Amount
+
+                <div class="amount-input">
+
+                  <span>
+                    ₹
+                  </span>
+
+                  <input
+                    id="billAmount"
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    placeholder="0.00"
+                    required
+                  >
+
+                </div>
+
+              </label>
+
+
+              <button
+                class="primary-btn"
+                type="submit"
+              >
+                Pay Bill
+              </button>
+
+
+            </form>
+
+          </div>
+
+        </div>
+
+
+      </section>
+
+    </main>
+
+  </div>
+
+
+  <!-- =====================================================
+       AUTHENTICATION MODAL
+  ====================================================== -->
+  <div
+    id="authModal"
+    class="modal"
+  >
+
+    <div class="modal-box">
+
+      <!-- X button -->
+      <button
+        id="closeAuth"
+        class="modal-close"
+        type="button"
+        aria-label="Close login"
+      >
+        ×
+      </button>
+
+
+      <div class="auth-logo">
+        P
+      </div>
+
+
+      <h2 id="authTitle">
+        Welcome to PayFlow
+      </h2>
+
+
+      <p id="authSubtitle">
+        Sign in to access your wallet
+      </p>
+
+
+      <form id="authForm">
+
+
+        <label>
+
+          Email
+
+          <input
+            id="authEmail"
+            type="email"
+            placeholder="you@example.com"
+            autocomplete="email"
+            required
+          >
+
+        </label>
+
+
+        <label>
+
+          Password
+
+          <input
+            id="authPassword"
+            type="password"
+            placeholder="••••••••"
+            minlength="6"
+            autocomplete="current-password"
+            required
+          >
+
+        </label>
+
+
+        <button
+          id="authSubmit"
+          class="primary-btn"
+          type="submit"
+        >
+          Sign In
+        </button>
+
+
+      </form>
+
+
+      <button
+        id="authToggle"
+        class="auth-toggle"
+        type="button"
+      >
+        Don't have an account? Create one
+      </button>
+
+
     </div>
-</div>
 
-<!-- AUTH MODAL -->
-<div class="modal-backdrop hidden" id="authModal">
-    <div class="modal">
-        <button class="modal-close" id="authClose">×</button>
-        <span class="eyebrow">PAYFLOW ACCOUNT</span>
-        <h2 id="authTitle">Sign in</h2>
-        <p id="authSubtitle">Use your Supabase account to sync your wallet and transactions.</p>
-        <form id="authForm">
-            <label>Email<input id="authEmail" type="email" placeholder="you@example.com" required></label>
-            <label>Password<input id="authPassword" type="password" minlength="6" placeholder="••••••••" required></label>
-            <label id="authNameLabel" class="hidden">Full Name<input id="authName" type="text" placeholder="Harsha Reddy"></label>
-            <button class="primary-btn full-btn" type="submit" id="authSubmit">Sign in</button>
-        </form>
-        <button class="link-btn" id="authModeBtn">Create a new account</button>
-        <div class="demo-note">For a real deployment, configure Supabase URL + publishable key in <code>script.js</code>.</div>
-    </div>
-</div>
+  </div>
 
-<div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="script.js"></script>
+  <!-- =====================================================
+       JAVASCRIPT
+  ====================================================== -->
+  <script src="script.js"></script>
+
 </body>
 </html>
