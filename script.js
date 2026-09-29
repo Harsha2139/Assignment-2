@@ -1,1781 +1,2454 @@
 /* =========================================================
-   PAYFLOW PRO — JAVASCRIPT
-   Supabase + Demo Mode
+   PAYFLOW PRO
+   Complete Corrected JavaScript
    ========================================================= */
 
-// =========================================================
-// 1. SUPABASE CONFIGURATION
-// =========================================================
+
+/* =========================================================
+   SUPABASE CONFIGURATION
+   ========================================================= */
+
+/*
+  IMPORTANT:
+  Replace these with your own Supabase project details.
+
+  Get them from:
+  Supabase Dashboard
+  → Project Settings
+  → API
+
+  Use:
+  - Project URL
+  - Publishable key / anon key
+
+  NEVER put the service_role / secret key here.
+*/
 
 const SUPABASE_URL = "https://zhivpgaqtfknvckupmdh.supabase.co";
 const SUPABASE_KEY = "sb_publishable_YOndHkKaFkGDsnT9W5j-mw_FS7PKzrN";
 
-const hasSupabaseConfig =
-    window.supabase &&
-    SUPABASE_URL.startsWith("https://") &&
-    !SUPABASE_URL.includes("YOUR_") &&
-    !SUPABASE_KEY.includes("YOUR_");
 
-const db = hasSupabaseConfig
-    ? window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_KEY,
-        {
-            auth: {
-                autoRefreshToken: true,
-                persistSession: true,
-                detectSessionInUrl: true
-            }
-        }
-    )
-    : null;
+/* =========================================================
+   SUPABASE CLIENT
+   ========================================================= */
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY,
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    }
+  }
+);
 
 
-// =========================================================
-// 2. DEMO DATA
-// =========================================================
-
-const demoProfile = {
-    id: "demo",
-    full_name: "Harsha Reddy",
-    email: "harsha@ybl",
-    upi_id: "harsha@ybl"
-};
+/* =========================================================
+   STATE
+   ========================================================= */
 
 let currentUser = null;
-
-let profile = {
-    ...demoProfile
-};
-
-let walletBalance = 67000;
-
-let transactions = [
-    {
-        id: "demo-1",
-        name: "Rahul Sharma",
-        type: "upi",
-        description: "UPI Transfer",
-        amount: 500,
-        status: "success",
-        created_at: "2026-09-29T10:30:00"
-    },
-    {
-        id: "demo-2",
-        name: "FreshMart Supermarket",
-        type: "upi",
-        description: "Merchant Payment",
-        amount: 850,
-        status: "success",
-        created_at: "2026-09-29T09:15:00"
-    },
-    {
-        id: "demo-3",
-        name: "Priya Reddy",
-        type: "upi",
-        description: "UPI Transfer",
-        amount: 1200,
-        status: "pending",
-        created_at: "2026-09-28T18:45:00"
-    },
-    {
-        id: "demo-4",
-        name: "Metro Electronics",
-        type: "upi",
-        description: "Merchant Payment",
-        amount: 5600,
-        status: "success",
-        created_at: "2026-09-28T15:20:00"
-    },
-    {
-        id: "demo-5",
-        name: "Electricity Bill",
-        type: "bill",
-        description: "TANGEDCO",
-        amount: 1250,
-        status: "failed",
-        created_at: "2026-09-28T12:00:00"
-    }
-];
+let profile = null;
+let wallet = null;
+let transactions = [];
+let authMode = "signin";
+let toastTimer = null;
 
 
-// =========================================================
-// 3. SHORTCUT
-// =========================================================
+/* =========================================================
+   DOM HELPERS
+   ========================================================= */
 
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
+
+const toast = $("toast");
+const sidebar = $("sidebar");
+const pageTitle = $("pageTitle");
+const pageSubtitle = $("pageSubtitle");
 
 
-// =========================================================
-// 4. MONEY FORMAT
-// =========================================================
+/* =========================================================
+   APP VISIBILITY
+   ========================================================= */
 
-function money(value) {
+function showApp() {
 
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 2
-    }).format(Number(value || 0));
+  const app = $("app");
+
+  if (!app) return;
+
+  app.classList.remove("logged-out");
+  app.classList.add("logged-in");
 
 }
 
 
-// =========================================================
-// 5. TOAST MESSAGE
-// =========================================================
+function hideApp() {
 
-function showMessage(message) {
+  const app = $("app");
 
-    const toast = $("toast");
+  if (!app) return;
 
-    if (!toast) return;
-
-    toast.textContent = message;
-
-    toast.classList.add("show");
-
-    clearTimeout(window.__toastTimer);
-
-    window.__toastTimer = setTimeout(() => {
-
-        toast.classList.remove("show");
-
-    }, 2600);
+  app.classList.remove("logged-in");
+  app.classList.add("logged-out");
 
 }
 
 
-// =========================================================
-// 6. DATE FORMAT
-// =========================================================
+/* =========================================================
+   TOAST
+   ========================================================= */
 
-function formatDate(value) {
+function showToast(message, type = "normal") {
 
-    const date = new Date(value);
+  if (!toast) return;
 
-    if (Number.isNaN(date.getTime())) {
-        return "Recently";
-    }
+  clearTimeout(toastTimer);
 
-    return date.toLocaleString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-    });
+  toast.textContent = message;
 
-}
+  toast.className = "toast show";
 
+  if (type === "success") {
+    toast.classList.add("success");
+  }
 
-// =========================================================
-// 7. HTML SECURITY
-// =========================================================
+  if (type === "error") {
+    toast.classList.add("error");
+  }
 
-function escapeHtml(value) {
+  toastTimer = setTimeout(() => {
 
-    return String(value ?? "").replace(
-        /[&<>"']/g,
-        char => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#039;"
-        }[char])
-    );
+    toast.className = "toast";
+
+  }, 3500);
 
 }
 
 
-// =========================================================
-// 8. INITIALS
-// =========================================================
+/* =========================================================
+   MONEY FORMAT
+   ========================================================= */
 
-function initials(name) {
+function formatMoney(amount) {
 
-    return String(name || "H")
-        .split(" ")
-        .map(x => x[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
-
-}
-
-
-// =========================================================
-// 9. BALANCE
-// =========================================================
-
-function setBalance(value) {
-
-    walletBalance = Number(value || 0);
-
-    if ($("balanceAmount")) {
-        $("balanceAmount").textContent = money(walletBalance);
-    }
-
-    if ($("paymentBalance")) {
-        $("paymentBalance").textContent = money(walletBalance);
-    }
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2
+  }).format(Number(amount || 0));
 
 }
 
 
-// =========================================================
-// 10. PROFILE
-// =========================================================
+/* =========================================================
+   DATE FORMAT
+   ========================================================= */
 
-function renderProfile() {
+function formatDate(date) {
 
-    if ($("profileName")) {
-        $("profileName").textContent =
-            profile.full_name || "PayFlow User";
-    }
+  if (!date) return "";
 
-    if ($("profileEmail")) {
-        $("profileEmail").textContent =
-            profile.upi_id ||
-            profile.email ||
-            "user@ybl";
-    }
-
-    if ($("profileAvatar")) {
-        $("profileAvatar").textContent =
-            initials(profile.full_name);
-    }
+  return new Date(date).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
 
 }
 
 
-// =========================================================
-// 11. DASHBOARD STATS
-// =========================================================
+/* =========================================================
+   HTML ESCAPE
+   ========================================================= */
 
-function renderStats() {
+function escapeHTML(value) {
 
-    const sent = transactions
-        .filter(t =>
-            ["upi", "recharge", "bill"].includes(t.type) &&
-            t.status === "success"
-        )
-        .reduce(
-            (sum, t) =>
-                sum + Number(t.amount || 0),
-            0
-        );
-
-    if ($("totalSent")) {
-        $("totalSent").textContent = money(sent);
-    }
-
-    if ($("successCount")) {
-        $("successCount").textContent =
-            transactions.filter(
-                t => t.status === "success"
-            ).length;
-    }
-
-    if ($("pendingCount")) {
-        $("pendingCount").textContent =
-            transactions.filter(
-                t => t.status === "pending"
-            ).length;
-    }
-
-    if ($("failedCount")) {
-        $("failedCount").textContent =
-            transactions.filter(
-                t => t.status === "failed"
-            ).length;
-    }
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 
 }
 
 
-// =========================================================
-// 12. TRANSACTION HTML
-// =========================================================
+/* =========================================================
+   AUTH MODAL
+   ========================================================= */
 
-function transactionHtml(t) {
+function openAuthModal() {
 
-    const name =
-        t.name ||
-        t.counterparty ||
-        t.description ||
-        "Payment";
+  const modal = $("authModal");
 
-    const typeLabel =
-        t.type === "recharge"
-            ? "Mobile Recharge"
-            : t.type === "bill"
-                ? "Bill Payment"
-                : "UPI Transfer";
+  if (!modal) return;
 
-    const icon = initials(name);
-
-    const iconClass =
-        t.status === "failed"
-            ? "green-bg"
-            : t.type === "recharge"
-                ? "green-bg"
-                : "blue-bg";
-
-    return `
-        <div class="transaction">
-
-            <div class="transaction-icon ${iconClass}">
-                ${escapeHtml(icon)}
-            </div>
-
-            <div class="transaction-info">
-
-                <strong>
-                    ${escapeHtml(name)}
-                </strong>
-
-                <small>
-                    ${escapeHtml(typeLabel)}
-                    •
-                    ${escapeHtml(formatDate(t.created_at))}
-                </small>
-
-            </div>
-
-            <div class="transaction-amount">
-
-                <strong>
-                    - ${money(t.amount)}
-                </strong>
-
-                <small class="${escapeHtml(t.status)}">
-                    ${escapeHtml(
-                        t.status.charAt(0).toUpperCase() +
-                        t.status.slice(1)
-                    )}
-                </small>
-
-            </div>
-
-        </div>
-    `;
+  modal.classList.remove("hidden");
 
 }
 
 
-// =========================================================
-// 13. RENDER TRANSACTIONS
-// =========================================================
+function closeAuthModal() {
 
-function renderTransactions(list = transactions) {
+  /*
+    VERY IMPORTANT:
+    A logged-out user cannot close the authentication
+    modal and expose the dashboard.
+  */
 
-    const html = list.length
-        ? list.map(transactionHtml).join("")
-        : `
-            <div class="empty-state">
-                No transactions match your filters.
-            </div>
-        `;
+  if (!currentUser) {
 
-    if ($("dashboardTransactions")) {
+    openAuthModal();
 
-        $("dashboardTransactions").innerHTML =
-            list
-                .slice(0, 5)
-                .map(transactionHtml)
-                .join("") ||
-            `
-                <div class="empty-state">
-                    No transactions yet.
-                </div>
-            `;
-    }
+    return;
 
-    if ($("transactionList")) {
-        $("transactionList").innerHTML = html;
-    }
+  }
 
-    renderStats();
+  const modal = $("authModal");
 
-    renderChart();
+  if (!modal) return;
+
+  modal.classList.add("hidden");
 
 }
 
 
-// =========================================================
-// 14. CHART
-// =========================================================
+function setAuthMode(mode) {
 
-function renderChart() {
+  authMode = mode;
 
-    if (!$("miniChart")) return;
-
-    const months = [
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep"
-    ];
-
-    const values = [
-        38,
-        54,
-        42,
-        70,
-        58,
-        82
-    ];
-
-    $("miniChart").innerHTML =
-        values
-            .map(
-                (value, index) => `
-                    <div
-                        class="bar"
-                        style="height:${value}%"
-                    >
-                        <span>
-                            ${months[index]}
-                        </span>
-                    </div>
-                `
-            )
-            .join("");
-
-}
-
-
-// =========================================================
-// 15. FILTERS
-// =========================================================
-
-function applyFilters() {
-
-    const search =
-        ($("searchInput")?.value || "")
-            .trim()
-            .toLowerCase();
-
-    const status =
-        $("statusFilter")?.value || "all";
-
-    const type =
-        $("typeFilter")?.value || "all";
-
-    const filtered =
-        transactions.filter(t => {
-
-            const text =
-                `${t.name || ""}
-                 ${t.description || ""}
-                 ${t.counterparty || ""}`
-                    .toLowerCase();
-
-            return (
-                (!search || text.includes(search)) &&
-                (status === "all" ||
-                    t.status === status) &&
-                (type === "all" ||
-                    t.type === type)
-            );
-
-        });
-
-    renderTransactions(filtered);
-
-}
-
-
-// =========================================================
-// 16. PAGE NAVIGATION
-// =========================================================
-
-function openView(viewId) {
-
-    document
-        .querySelectorAll(".view")
-        .forEach(view =>
-            view.classList.remove("active-view")
-        );
-
-    const view = $(viewId);
-
-    if (!view) return;
-
-    view.classList.add("active-view");
-
-    document
-        .querySelectorAll(
-            ".nav-item[data-view]"
-        )
-        .forEach(button => {
-
-            button.classList.toggle(
-                "active",
-                button.dataset.view === viewId
-            );
-
-        });
-
-    const labels = {
-
-        dashboardView:
-            "Dashboard",
-
-        transactionsView:
-            "Transactions",
-
-        paymentsView:
-            "Send Money",
-
-        rechargeView:
-            "Mobile Recharge",
-
-        billsView:
-            "Pay Bills"
-
-    };
-
-    if ($("pageTitle")) {
-
-        $("pageTitle").textContent =
-            labels[viewId] || "Dashboard";
-
-    }
-
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
-
-    if ($("sidebar")) {
-        $("sidebar").classList.remove("open");
-    }
-
-}
-
-
-// =========================================================
-// 17. LOAD PROFILE FROM SUPABASE
-// =========================================================
-
-async function loadProfile() {
-
-    if (!db || !currentUser) {
-
-        profile = {
-            ...demoProfile
-        };
-
-        renderProfile();
-
-        return;
-    }
-
-    const {
-        data,
-        error
-    } = await db
-        .from("profiles")
-        .select("*")
-        .eq("user_id", currentUser.id)
-        .maybeSingle();
-
-    if (error) {
-
-        console.error(error);
-
-        showMessage(
-            "Could not load profile"
-        );
-
-        return;
-    }
-
-    if (data) {
-        profile = data;
-    }
-
-    renderProfile();
-
-}
-
-
-// =========================================================
-// 18. LOAD WALLET
-// =========================================================
-
-async function loadWallet() {
-
-    if (!db || !currentUser) {
-
-        setBalance(67000);
-
-        return;
-    }
-
-    const {
-        data,
-        error
-    } = await db
-        .from("wallets")
-        .select("balance,account_label")
-        .eq("user_id", currentUser.id)
-        .maybeSingle();
-
-    if (error) {
-
-        console.error(error);
-
-        showMessage(
-            "Could not load wallet"
-        );
-
-        return;
-    }
-
-    if (data) {
-
-        setBalance(data.balance);
-
-        if ($("accountLabel")) {
-
-            $("accountLabel").textContent =
-                data.account_label ||
-                "Linked account";
-        }
-
-    }
-
-}
-
-
-// =========================================================
-// 19. LOAD TRANSACTIONS FROM SUPABASE
-// =========================================================
-
-async function loadTransactions() {
-
-    if (!db || !currentUser) {
-
-        renderTransactions();
-
-        return;
-    }
-
-    const {
-        data,
-        error
-    } = await db
-        .from("transactions")
-        .select("*")
-        .eq("user_id", currentUser.id)
-        .order(
-            "created_at",
-            {
-                ascending: false
-            }
-        )
-        .limit(100);
-
-    if (error) {
-
-        console.error(error);
-
-        showMessage(
-            "Could not load transactions"
-        );
-
-        return;
-    }
-
-    transactions =
-        (data || []).map(t => ({
-
-            ...t,
-
-            name:
-                t.counterparty ||
-                t.description ||
-                t.type
-
-        }));
-
-    renderTransactions();
-
-}
-
-
-// =========================================================
-// 20. REFRESH APPLICATION
-// =========================================================
-
-async function refreshApp() {
-
-    if (!db || !currentUser) {
-
-        if ($("syncLabel")) {
-
-            $("syncLabel").textContent =
-                "Demo data · Supabase not configured";
-
-        }
-
-        renderProfile();
-
-        setBalance(67000);
-
-        renderTransactions();
-
-        return;
-    }
-
-    if ($("syncLabel")) {
-
-        $("syncLabel").textContent =
-            "Syncing securely…";
-
-    }
-
-    await Promise.all([
-        loadProfile(),
-        loadWallet(),
-        loadTransactions()
-    ]);
-
-    if ($("syncLabel")) {
-
-        $("syncLabel").textContent =
-            "Synced with Supabase";
-
-    }
-
-}
-
-
-// =========================================================
-// 21. SEND MONEY
-// =========================================================
-
-async function sendMoney(event) {
-
-    event.preventDefault();
-
-    const upi =
-        $("upiInput").value.trim();
-
-    const amount =
-        Number(
-            $("amountInput").value
-        );
-
-    const description =
-        $("descriptionInput").value.trim() ||
-        "UPI Transfer";
-
-    if (!upi.includes("@")) {
-
-        showMessage(
-            "Enter a valid UPI ID"
-        );
-
-        return;
-    }
-
-    if (!amount || amount <= 0) {
-
-        showMessage(
-            "Enter a valid amount"
-        );
-
-        return;
-    }
-
-    if (amount > walletBalance) {
-
-        showMessage(
-            "Insufficient wallet balance"
-        );
-
-        return;
-    }
-
-    const btn = $("payBtn");
-
-    btn.disabled = true;
-
-    btn.textContent =
-        "Processing…";
-
-    try {
-
-        // -----------------------------
-        // DEMO MODE
-        // -----------------------------
-
-        if (!db || !currentUser) {
-
-            walletBalance -= amount;
-
-            transactions.unshift({
-
-                id: crypto.randomUUID(),
-
-                name: upi,
-
-                counterparty: upi,
-
-                description,
-
-                type: "upi",
-
-                amount,
-
-                status: "success",
-
-                created_at:
-                    new Date().toISOString()
-
-            });
-
-            setBalance(walletBalance);
-
-            renderTransactions();
-
-            $("paymentForm").reset();
-
-            showMessage(
-                `Demo payment of ${money(amount)} sent to ${upi}`
-            );
-
-            return;
-        }
-
-
-        // -----------------------------
-        // SUPABASE RPC
-        // -----------------------------
-
-        const {
-            data,
-            error
-        } = await db.rpc(
-            "send_money",
-            {
-                p_receiver_upi: upi,
-                p_amount: amount,
-                p_description: description
-            }
-        );
-
-        if (error) {
-            throw error;
-        }
-
-        if (data?.new_balance !== undefined) {
-
-            setBalance(
-                data.new_balance
-            );
-
-        }
-
-        $("paymentForm").reset();
-
-        await refreshApp();
-
-        showMessage(
-            `Payment of ${money(amount)} recorded successfully`
-        );
-
-    } catch (error) {
-
-        console.error(error);
-
-        showMessage(
-            error.message ||
-            "Payment failed"
-        );
-
-    } finally {
-
-        btn.disabled = false;
-
-        btn.textContent =
-            "Pay Securely";
-
-    }
-
-}
-
-
-// =========================================================
-// 22. MOBILE RECHARGE
-// =========================================================
-
-async function recharge(event) {
-
-    event.preventDefault();
-
-    const mobile =
-        $("mobileInput").value.trim();
-
-    const operator =
-        $("operatorInput").value;
-
-    const amount =
-        Number(
-            $("rechargeAmountInput").value
-        );
-
-    if (!/^[0-9]{10}$/.test(mobile)) {
-
-        showMessage(
-            "Enter a valid 10-digit mobile number"
-        );
-
-        return;
-    }
-
-    if (!operator) {
-
-        showMessage(
-            "Select an operator"
-        );
-
-        return;
-    }
-
-    if (!amount || amount <= 0) {
-
-        showMessage(
-            "Enter a valid recharge amount"
-        );
-
-        return;
-    }
-
-    if (amount > walletBalance) {
-
-        showMessage(
-            "Insufficient wallet balance"
-        );
-
-        return;
-    }
-
-    const btn =
-        $("rechargeBtn");
-
-    btn.disabled = true;
-
-    btn.textContent =
-        "Processing…";
-
-    try {
-
-        // DEMO
-
-        if (!db || !currentUser) {
-
-            walletBalance -= amount;
-
-            transactions.unshift({
-
-                id: crypto.randomUUID(),
-
-                name:
-                    `${operator} • ${mobile}`,
-
-                description:
-                    "Mobile Recharge",
-
-                type:
-                    "recharge",
-
-                amount,
-
-                status:
-                    "success",
-
-                created_at:
-                    new Date().toISOString()
-
-            });
-
-            setBalance(walletBalance);
-
-            renderTransactions();
-
-            $("rechargeForm").reset();
-
-            showMessage(
-                `Demo recharge of ${money(amount)} submitted`
-            );
-
-            return;
-        }
-
-
-        // SUPABASE
-
-        const {
-            error
-        } = await db.rpc(
-            "recharge_mobile",
-            {
-                p_mobile: mobile,
-                p_operator: operator,
-                p_amount: amount
-            }
-        );
-
-        if (error) {
-            throw error;
-        }
-
-        $("rechargeForm").reset();
-
-        await refreshApp();
-
-        showMessage(
-            `Recharge of ${money(amount)} recorded`
-        );
-
-    } catch (error) {
-
-        console.error(error);
-
-        showMessage(
-            error.message ||
-            "Recharge failed"
-        );
-
-    } finally {
-
-        btn.disabled = false;
-
-        btn.textContent =
-            "Recharge Now";
-
-    }
-
-}
-
-
-// =========================================================
-// 23. OPEN BILL FORM
-// =========================================================
-
-function openBillForm(type) {
-
-    $("billTypeInput").value =
-        type;
-
-    $("billFormCard")
-        .classList
-        .remove("hidden");
-
-    $("billFormCard")
-        .scrollIntoView({
-            behavior: "smooth",
-            block: "center"
-        });
-
-}
-
-
-// =========================================================
-// 24. PAY BILL
-// =========================================================
-
-async function payBill(event) {
-
-    event.preventDefault();
-
-    const type =
-        $("billTypeInput").value;
-
-    const account =
-        $("consumerInput").value.trim();
-
-    const amount =
-        Number(
-            $("billAmountInput").value
-        );
-
-    if (!type || !account) {
-
-        showMessage(
-            "Enter bill account details"
-        );
-
-        return;
-    }
-
-    if (!amount || amount <= 0) {
-
-        showMessage(
-            "Enter a valid bill amount"
-        );
-
-        return;
-    }
-
-    if (amount > walletBalance) {
-
-        showMessage(
-            "Insufficient wallet balance"
-        );
-
-        return;
-    }
-
-    try {
-
-        // DEMO
-
-        if (!db || !currentUser) {
-
-            walletBalance -= amount;
-
-            transactions.unshift({
-
-                id: crypto.randomUUID(),
-
-                name:
-                    `${type} Bill`,
-
-                description:
-                    `Bill Payment • ${account}`,
-
-                type:
-                    "bill",
-
-                amount,
-
-                status:
-                    "success",
-
-                created_at:
-                    new Date().toISOString()
-
-            });
-
-            setBalance(walletBalance);
-
-            renderTransactions();
-
-            $("billForm").reset();
-
-            $("billFormCard")
-                .classList
-                .add("hidden");
-
-            showMessage(
-                `${type} bill of ${money(amount)} recorded`
-            );
-
-            return;
-        }
-
-
-        // SUPABASE
-
-        const {
-            error
-        } = await db.rpc(
-            "pay_bill",
-            {
-                p_bill_type: type,
-                p_account_number: account,
-                p_amount: amount
-            }
-        );
-
-        if (error) {
-            throw error;
-        }
-
-        $("billForm").reset();
-
-        $("billFormCard")
-            .classList
-            .add("hidden");
-
-        await refreshApp();
-
-        showMessage(
-            `${type} bill payment recorded`
-        );
-
-    } catch (error) {
-
-        console.error(error);
-
-        showMessage(
-            error.message ||
-            "Bill payment failed"
-        );
-
-    }
-
-}
-
-
-// =========================================================
-// 25. NAVIGATION EVENTS
-// =========================================================
-
-function setupNavigation() {
-
-    document
-        .querySelectorAll("[data-open]")
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                () =>
-                    openView(
-                        button.dataset.open
-                    )
-            );
-
-        });
-
-
-    document
-        .querySelectorAll(
-            ".nav-item[data-view]"
-        )
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                () =>
-                    openView(
-                        button.dataset.view
-                    )
-            );
-
-        });
-
-
-    if ($("menuBtn")) {
-
-        $("menuBtn")
-            .addEventListener(
-                "click",
-                () =>
-                    $("sidebar")
-                        .classList
-                        .toggle("open")
-            );
-
-    }
-
-
-    if ($("refreshBtn")) {
-
-        $("refreshBtn")
-            .addEventListener(
-                "click",
-                refreshApp
-            );
-
-    }
-
-
-    if ($("scanBtn")) {
-
-        $("scanBtn")
-            .addEventListener(
-                "click",
-                () =>
-                    showMessage(
-                        "Scan & Pay UI can be connected to a QR scanner next."
-                    )
-            );
-
-    }
-
-
-    if ($("profileBtn")) {
-
-        $("profileBtn")
-            .addEventListener(
-                "click",
-                () =>
-                    showMessage(
-                        `${profile.full_name || "Profile"} account`
-                    )
-            );
-
-    }
-
-
-    if ($("searchInput")) {
-
-        $("searchInput")
-            .addEventListener(
-                "input",
-                applyFilters
-            );
-
-    }
-
-
-    if ($("statusFilter")) {
-
-        $("statusFilter")
-            .addEventListener(
-                "change",
-                applyFilters
-            );
-
-    }
-
-
-    if ($("typeFilter")) {
-
-        $("typeFilter")
-            .addEventListener(
-                "change",
-                applyFilters
-            );
-
-    }
-
-
-    document
-        .querySelectorAll(".bill-card")
-        .forEach(card => {
-
-            card.addEventListener(
-                "click",
-                () =>
-                    openBillForm(
-                        card.dataset.bill
-                    )
-            );
-
-        });
-
-}
-
-
-// =========================================================
-// 26. AUTH MODAL
-// =========================================================
-
-function openAuth(mode = "login") {
-
-    $("authModal")
-        .classList
-        .remove("hidden");
+  if (mode === "signin") {
 
     $("authTitle").textContent =
-        mode === "login"
-            ? "Sign in"
-            : "Create account";
+      "Welcome to PayFlow";
 
     $("authSubtitle").textContent =
-        mode === "login"
-            ? "Use your Supabase account to sync your wallet and transactions."
-            : "Create a Supabase account for your private PayFlow data.";
+      "Sign in to access your wallet";
 
     $("authSubmit").textContent =
-        mode === "login"
-            ? "Sign in"
-            : "Create account";
+      "Sign In";
 
-    $("authNameLabel")
-        .classList
-        .toggle(
-            "hidden",
-            mode === "login"
-        );
+    $("authToggle").textContent =
+      "Don't have an account? Create one";
 
-    $("authModeBtn").textContent =
-        mode === "login"
-            ? "Create a new account"
-            : "I already have an account";
+  } else {
 
-    $("authForm").dataset.mode =
-        mode;
+    $("authTitle").textContent =
+      "Create your PayFlow account";
 
-}
+    $("authSubtitle").textContent =
+      "Create an account to start using PayFlow";
 
+    $("authSubmit").textContent =
+      "Create Account";
 
-// =========================================================
-// 27. AUTHENTICATION
-// =========================================================
+    $("authToggle").textContent =
+      "Already have an account? Sign In";
 
-async function submitAuth(event) {
-
-    event.preventDefault();
-
-    if (!db) {
-
-        showMessage(
-            "Supabase is not configured — demo mode is active."
-        );
-
-        $("authModal")
-            .classList
-            .add("hidden");
-
-        return;
-    }
-
-    const email =
-        $("authEmail")
-            .value
-            .trim();
-
-    const password =
-        $("authPassword")
-            .value;
-
-    const mode =
-        $("authForm")
-            .dataset
-            .mode;
-
-    const name =
-        $("authName")
-            .value
-            .trim();
-
-    $("authSubmit")
-        .disabled = true;
-
-    try {
-
-        if (mode === "login") {
-
-            const {
-                error
-            } = await db.auth
-                .signInWithPassword({
-                    email,
-                    password
-                });
-
-            if (error) {
-                throw error;
-            }
-
-            $("authModal")
-                .classList
-                .add("hidden");
-
-            showMessage(
-                "Signed in successfully"
-            );
-
-        } else {
-
-            const {
-                data,
-                error
-            } = await db.auth
-                .signUp({
-                    email,
-                    password,
-                    options: {
-                        data: {
-                            full_name:
-                                name ||
-                                "PayFlow User"
-                        }
-                    }
-                });
-
-            if (error) {
-                throw error;
-            }
-
-            if (data.session) {
-
-                $("authModal")
-                    .classList
-                    .add("hidden");
-
-                showMessage(
-                    "Account created"
-                );
-
-            } else {
-
-                showMessage(
-                    "Account created. Check your email to confirm it."
-                );
-
-            }
-
-        }
-
-    } catch (error) {
-
-        console.error(error);
-
-        showMessage(
-            error.message ||
-            "Authentication failed"
-        );
-
-    } finally {
-
-        $("authSubmit")
-            .disabled = false;
-
-    }
+  }
 
 }
 
 
-// =========================================================
-// 28. SIGN OUT
-// =========================================================
+/* =========================================================
+   AUTHENTICATION
+   ========================================================= */
 
-async function signOut() {
+async function handleAuth(event) {
 
-    if (!db || !currentUser) {
+  event.preventDefault();
 
-        showMessage(
-            "Demo mode signed out"
-        );
+  const email =
+    $("authEmail").value.trim();
 
-        return;
-    }
+  const password =
+    $("authPassword").value;
 
-    const {
+
+  if (!email || !password) {
+
+    showToast(
+      "Enter email and password",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (password.length < 6) {
+
+    showToast(
+      "Password must contain at least 6 characters",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  $("authSubmit").disabled = true;
+
+
+  try {
+
+    if (authMode === "signin") {
+
+      const {
+        data,
         error
-    } = await db.auth.signOut();
+      } =
+        await supabaseClient.auth.signInWithPassword({
+          email,
+          password
+        });
 
-    if (error) {
 
-        showMessage(
-            error.message
+      if (error) {
+        throw error;
+      }
+
+
+      if (!data.user) {
+
+        throw new Error(
+          "Could not sign in. Please try again."
         );
 
-        return;
-    }
-
-    currentUser = null;
-
-    showMessage(
-        "Signed out"
-    );
-
-    setTimeout(
-        () => location.reload(),
-        500
-    );
-
-}
+      }
 
 
-// =========================================================
-// 29. SUPABASE AUTH INITIALIZATION
-// =========================================================
+      currentUser = data.user;
 
-async function initAuth() {
+      showApp();
 
-    if (!db) {
+      closeAuthModal();
 
-        if ($("syncLabel")) {
+      showToast(
+        "Signed in successfully",
+        "success"
+      );
 
-            $("syncLabel").textContent =
-                "Demo data · add Supabase keys for cloud database";
-
-        }
-
-        return;
-    }
-
-    const {
-        data
-    } = await db.auth.getSession();
-
-    currentUser =
-        data.session?.user ||
-        null;
-
-    if (!currentUser) {
-
-        openAuth("login");
+      await loadApp();
 
     } else {
 
-        await refreshApp();
+      const {
+        data,
+        error
+      } =
+        await supabaseClient.auth.signUp({
+
+          email,
+
+          password,
+
+          options: {
+            data: {
+              full_name:
+                email
+                  .split("@")[0]
+            }
+          }
+
+        });
+
+
+      if (error) {
+        throw error;
+      }
+
+
+      /*
+        If email confirmation is disabled,
+        Supabase gives us a session immediately.
+      */
+
+      if (data.session && data.user) {
+
+        currentUser = data.user;
+
+        showApp();
+
+        closeAuthModal();
+
+        showToast(
+          "Account created successfully",
+          "success"
+        );
+
+        await loadApp();
+
+      } else {
+
+        /*
+          If email confirmation is enabled,
+          the user must verify their email.
+        */
+
+        showToast(
+          "Account created. Check your email to confirm your account.",
+          "success"
+        );
+
+        setAuthMode("signin");
+
+      }
+
+    }
+
+  } catch (error) {
+
+    console.error("Authentication error:", error);
+
+    showToast(
+      error.message || "Authentication failed",
+      "error"
+    );
+
+  } finally {
+
+    $("authSubmit").disabled = false;
+
+  }
+
+}
+
+
+/* =========================================================
+   LOGOUT
+   ========================================================= */
+
+async function logout() {
+
+  try {
+
+    await supabaseClient.auth.signOut();
+
+  } catch (error) {
+
+    console.error("Logout error:", error);
+
+  }
+
+
+  currentUser = null;
+  profile = null;
+  wallet = null;
+  transactions = [];
+
+
+  hideApp();
+
+  openAuthModal();
+
+  setAuthMode("signin");
+
+  showToast(
+    "Signed out successfully",
+    "success"
+  );
+
+}
+
+
+/* =========================================================
+   LOAD PROFILE
+   ========================================================= */
+
+async function loadProfile() {
+
+  if (!currentUser) return;
+
+
+  const {
+    data,
+    error
+  } =
+    await supabaseClient
+      .from("profiles")
+      .select("*")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+
+
+  if (error) {
+
+    console.error(
+      "Profile loading error:",
+      error
+    );
+
+    showToast(
+      "Could not load profile",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  profile = data;
+
+
+  /*
+    Normally your database trigger creates
+    the profile automatically.
+
+    This is only a fallback.
+  */
+
+  if (!profile) {
+
+    const name =
+      currentUser.user_metadata?.full_name ||
+      currentUser.email?.split("@")[0] ||
+      "User";
+
+
+    const cleanName =
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+
+
+    const generatedUpi =
+      `${cleanName || "user"}@ybl`;
+
+
+    const {
+      data: createdProfile,
+      error: createError
+    } =
+      await supabaseClient
+        .from("profiles")
+        .insert({
+
+          id: currentUser.id,
+
+          full_name: name,
+
+          email: currentUser.email,
+
+          upi_id: generatedUpi
+
+        })
+        .select()
+        .single();
+
+
+    if (createError) {
+
+      console.error(
+        "Profile creation error:",
+        createError
+      );
+
+    } else {
+
+      profile = createdProfile;
+
+    }
+
+  }
+
+
+  updateProfileUI();
+
+}
+
+
+/* =========================================================
+   LOAD WALLET
+   ========================================================= */
+
+async function loadWallet() {
+
+  if (!currentUser) return;
+
+
+  const {
+    data,
+    error
+  } =
+    await supabaseClient
+      .from("wallets")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .maybeSingle();
+
+
+  if (error) {
+
+    console.error(
+      "Wallet loading error:",
+      error
+    );
+
+    showToast(
+      "Could not load wallet",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  wallet = data;
+
+  updateBalanceUI();
+
+}
+
+
+/* =========================================================
+   LOAD TRANSACTIONS
+   ========================================================= */
+
+async function loadTransactions() {
+
+  if (!currentUser) return;
+
+
+  const {
+    data,
+    error
+  } =
+    await supabaseClient
+      .from("transactions")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .order("created_at", {
+        ascending: false
+      })
+      .limit(100);
+
+
+  if (error) {
+
+    console.error(
+      "Transaction loading error:",
+      error
+    );
+
+    transactions = [];
+
+    renderTransactions();
+    renderStats();
+    renderChart();
+
+    return;
+
+  }
+
+
+  transactions = data || [];
+
+
+  renderTransactions();
+
+  renderStats();
+
+  renderChart();
+
+}
+
+
+/* =========================================================
+   PROFILE UI
+   ========================================================= */
+
+function updateProfileUI() {
+
+  if (!profile) return;
+
+
+  const name =
+    profile.full_name ||
+    currentUser?.email?.split("@")[0] ||
+    "User";
+
+
+  if ($("topName")) {
+
+    $("topName").textContent =
+      name;
+
+  }
+
+
+  if ($("topAvatar")) {
+
+    $("topAvatar").textContent =
+      name
+        .charAt(0)
+        .toUpperCase();
+
+  }
+
+
+  if ($("upiDisplay")) {
+
+    $("upiDisplay").textContent =
+      profile.upi_id ||
+      "Not available";
+
+  }
+
+}
+
+
+/* =========================================================
+   BALANCE UI
+   ========================================================= */
+
+function updateBalanceUI() {
+
+  const amount =
+    Number(wallet?.balance || 0);
+
+
+  if ($("balance")) {
+
+    $("balance").textContent =
+      formatMoney(amount);
+
+  }
+
+}
+
+
+/* =========================================================
+   PAGE INFORMATION
+   ========================================================= */
+
+const pageInfo = {
+
+  dashboard: {
+    title: "Dashboard",
+    subtitle:
+      "Welcome back to PayFlow Pro"
+  },
+
+  transactions: {
+    title: "Transactions",
+    subtitle:
+      "View your complete payment history"
+  },
+
+  send: {
+    title: "Send Money",
+    subtitle:
+      "Transfer money using UPI"
+  },
+
+  recharge: {
+    title: "Mobile Recharge",
+    subtitle:
+      "Recharge your mobile instantly"
+  },
+
+  bills: {
+    title: "Pay Bills",
+    subtitle:
+      "Pay your bills securely"
+  }
+
+};
+
+
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
+
+function showPage(page) {
+
+  if (!currentUser) {
+
+    openAuthModal();
+
+    return;
+
+  }
+
+
+  document
+    .querySelectorAll("[data-page-content]")
+    .forEach(section => {
+
+      section.classList.toggle(
+        "active",
+        section.dataset.pageContent === page
+      );
+
+    });
+
+
+  document
+    .querySelectorAll(".nav-item")
+    .forEach(button => {
+
+      button.classList.toggle(
+        "active",
+        button.dataset.page === page
+      );
+
+    });
+
+
+  const info =
+    pageInfo[page] ||
+    pageInfo.dashboard;
+
+
+  if (pageTitle) {
+
+    pageTitle.textContent =
+      info.title;
+
+  }
+
+
+  if (pageSubtitle) {
+
+    pageSubtitle.textContent =
+      info.subtitle;
+
+  }
+
+
+  closeMobileMenu();
+
+}
+
+
+/* =========================================================
+   MOBILE MENU
+   ========================================================= */
+
+function openMobileMenu() {
+
+  if (!sidebar) return;
+
+  sidebar.classList.add("open");
+
+
+  const overlay =
+    document.querySelector(".mobile-overlay");
+
+
+  if (overlay) {
+
+    overlay.classList.add("active");
+
+  }
+
+}
+
+
+function closeMobileMenu() {
+
+  if (sidebar) {
+
+    sidebar.classList.remove("open");
+
+  }
+
+
+  const overlay =
+    document.querySelector(".mobile-overlay");
+
+
+  if (overlay) {
+
+    overlay.classList.remove("active");
+
+  }
+
+}
+
+
+/* =========================================================
+   TRANSACTION ICON
+   ========================================================= */
+
+function transactionIcon(transaction) {
+
+  if (transaction.type === "recharge") {
+    return "◉";
+  }
+
+  if (transaction.type === "bill") {
+    return "▣";
+  }
+
+  if (transaction.type === "merchant") {
+    return "🛍";
+  }
+
+  return "₹";
+
+}
+
+
+/* =========================================================
+   TRANSACTION HTML
+   ========================================================= */
+
+function transactionHTML(transaction) {
+
+  const status =
+    transaction.status ||
+    "success";
+
+
+  const amount =
+    Number(transaction.amount || 0);
+
+
+  const receiver =
+    transaction.receiver_upi ||
+    transaction.counterparty ||
+    "Payment";
+
+
+  const description =
+    transaction.description ||
+    "Payment";
+
+
+  return `
+
+    <div class="transaction-item">
+
+      <div class="transaction-icon">
+        ${transactionIcon(transaction)}
+      </div>
+
+      <div class="transaction-info">
+
+        <strong>
+          ${escapeHTML(receiver)}
+        </strong>
+
+        <small>
+          ${escapeHTML(description)}
+          •
+          ${formatDate(transaction.created_at)}
+        </small>
+
+      </div>
+
+      <div class="transaction-amount">
+
+        <strong>
+          -${formatMoney(amount)}
+        </strong>
+
+        <span
+          class="transaction-status ${escapeHTML(status)}"
+        >
+          ${escapeHTML(status)}
+        </span>
+
+      </div>
+
+    </div>
+
+  `;
+
+}
+
+
+/* =========================================================
+   RECENT TRANSACTIONS
+   ========================================================= */
+
+function renderRecentTransactions() {
+
+  const container =
+    $("recentTransactions");
+
+
+  if (!container) return;
+
+
+  const recent =
+    transactions.slice(0, 5);
+
+
+  if (!recent.length) {
+
+    container.innerHTML = `
+
+      <div class="empty-state">
+        No transactions yet.
+      </div>
+
+    `;
+
+    return;
+
+  }
+
+
+  container.innerHTML =
+    recent
+      .map(transactionHTML)
+      .join("");
+
+}
+
+
+/* =========================================================
+   ALL TRANSACTIONS
+   ========================================================= */
+
+function renderAllTransactions() {
+
+  const container =
+    $("allTransactions");
+
+
+  if (!container) return;
+
+
+  const search =
+    $("searchInput")?.value
+      .trim()
+      .toLowerCase() ||
+    "";
+
+
+  const status =
+    $("statusFilter")?.value ||
+    "all";
+
+
+  const type =
+    $("typeFilter")?.value ||
+    "all";
+
+
+  const filtered =
+    transactions.filter(transaction => {
+
+
+      const text = [
+
+        transaction.counterparty,
+
+        transaction.receiver_upi,
+
+        transaction.description,
+
+        transaction.type
+
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+
+      const matchesSearch =
+        !search ||
+        text.includes(search);
+
+
+      const matchesStatus =
+        status === "all" ||
+        transaction.status === status;
+
+
+      const matchesType =
+        type === "all" ||
+        transaction.type === type;
+
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesType
+      );
+
+    });
+
+
+  if (!filtered.length) {
+
+    container.innerHTML = `
+
+      <div class="empty-state">
+        No matching transactions found.
+      </div>
+
+    `;
+
+    return;
+
+  }
+
+
+  container.innerHTML =
+    filtered
+      .map(transactionHTML)
+      .join("");
+
+}
+
+
+/* =========================================================
+   RENDER TRANSACTIONS
+   ========================================================= */
+
+function renderTransactions() {
+
+  renderRecentTransactions();
+
+  renderAllTransactions();
+
+}
+
+
+/* =========================================================
+   STATISTICS
+   ========================================================= */
+
+function renderStats() {
+
+  const successful =
+    transactions.filter(
+      transaction =>
+        transaction.status === "success"
+    );
+
+
+  const pending =
+    transactions.filter(
+      transaction =>
+        transaction.status === "pending"
+    );
+
+
+  const failed =
+    transactions.filter(
+      transaction =>
+        transaction.status === "failed"
+    );
+
+
+  const totalSent =
+    successful.reduce(
+      (sum, transaction) =>
+        sum +
+        Number(transaction.amount || 0),
+      0
+    );
+
+
+  if ($("totalSent")) {
+
+    $("totalSent").textContent =
+      formatMoney(totalSent);
+
+  }
+
+
+  if ($("successfulCount")) {
+
+    $("successfulCount").textContent =
+      successful.length;
+
+  }
+
+
+  if ($("pendingCount")) {
+
+    $("pendingCount").textContent =
+      pending.length;
+
+  }
+
+
+  if ($("failedCount")) {
+
+    $("failedCount").textContent =
+      failed.length;
+
+  }
+
+}
+
+
+/* =========================================================
+   CHART
+   ========================================================= */
+
+function renderChart() {
+
+  const container =
+    $("chartBars");
+
+
+  if (!container) return;
+
+
+  if (!transactions.length) {
+
+    container.innerHTML = `
+
+      <div class="chart-empty">
+        No payment data yet
+      </div>
+
+    `;
+
+    return;
+
+  }
+
+
+  const now =
+    new Date();
+
+
+  const values = [];
+
+
+  for (let i = 6; i >= 0; i--) {
+
+    const date =
+      new Date(now);
+
+
+    date.setDate(
+      now.getDate() - i
+    );
+
+
+    const year =
+      date.getFullYear();
+
+
+    const month =
+      String(
+        date.getMonth() + 1
+      ).padStart(2, "0");
+
+
+    const day =
+      String(
+        date.getDate()
+      ).padStart(2, "0");
+
+
+    const dateString =
+      `${year}-${month}-${day}`;
+
+
+    const total =
+      transactions
+        .filter(transaction => {
+
+          if (!transaction.created_at) {
+            return false;
+          }
+
+
+          return transaction.created_at
+            .slice(0, 10) ===
+            dateString;
+
+        })
+        .reduce(
+          (sum, transaction) =>
+            sum +
+            Number(transaction.amount || 0),
+          0
+        );
+
+
+    values.push({
+      date,
+      total
+    });
+
+  }
+
+
+  const max =
+    Math.max(
+      ...values.map(
+        item => item.total
+      ),
+      1
+    );
+
+
+  container.innerHTML =
+    values
+      .map(item => {
+
+        const height =
+          Math.max(
+            5,
+            (item.total / max) * 85
+          );
+
+
+        const label =
+          item.date.toLocaleDateString(
+            "en-IN",
+            {
+              weekday: "short"
+            }
+          );
+
+
+        return `
+
+          <div
+            class="chart-bar-wrap"
+            style="
+              height:100%;
+              display:flex;
+              flex-direction:column;
+              justify-content:flex-end;
+              align-items:center;
+              gap:6px;
+              flex:1;
+            "
+          >
+
+            <div
+              class="chart-bar"
+              style="height:${height}%"
+              title="${formatMoney(item.total)}"
+            ></div>
+
+            <small
+              style="
+                font-size:9px;
+                color:#6b7b73;
+              "
+            >
+              ${label}
+            </small>
+
+          </div>
+
+        `;
+
+      })
+      .join("");
+
+}
+
+
+/* =========================================================
+   SEND MONEY
+   ========================================================= */
+
+async function sendMoney(event) {
+
+  event.preventDefault();
+
+
+  if (!currentUser) {
+
+    openAuthModal();
+
+    return;
+
+  }
+
+
+  const receiverUpi =
+    $("receiverUpi")
+      .value
+      .trim();
+
+
+  const amount =
+    Number(
+      $("sendAmount").value
+    );
+
+
+  const description =
+    $("sendDescription")
+      .value
+      .trim() ||
+    "UPI Transfer";
+
+
+  if (!receiverUpi) {
+
+    showToast(
+      "Enter receiver UPI ID",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (!receiverUpi.includes("@")) {
+
+    showToast(
+      "Enter a valid UPI ID",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (!amount || amount <= 0) {
+
+    showToast(
+      "Enter a valid amount",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  const button =
+    event.submitter ||
+    $("sendForm")
+      .querySelector("button[type='submit']");
+
+
+  if (button) {
+    button.disabled = true;
+  }
+
+
+  try {
+
+    /*
+      These parameter names match your
+      existing Supabase SQL functions:
+
+      send_money(
+        receiver_upi,
+        send_amount,
+        send_description
+      )
+    */
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.rpc(
+        "send_money",
+        {
+          receiver_upi:
+            receiverUpi,
+
+          send_amount:
+            amount,
+
+          send_description:
+            description
+        }
+      );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    console.log(
+      "send_money result:",
+      data
+    );
+
+
+    $("sendForm").reset();
+
+
+    if ($("sendDescription")) {
+
+      $("sendDescription").value =
+        "UPI Transfer";
 
     }
 
 
-    db.auth.onAuthStateChange(
-        async (_event, session) => {
+    showToast(
+      `Payment of ${formatMoney(amount)} successful`,
+      "success"
+    );
 
-            currentUser =
-                session?.user ||
-                null;
 
-            if (currentUser) {
+    await loadWallet();
 
-                $("authModal")
-                    .classList
-                    .add("hidden");
+    await loadTransactions();
 
-                await refreshApp();
 
-            }
+  } catch (error) {
+
+    console.error(
+      "Send money error:",
+      error
+    );
+
+
+    showToast(
+      error.message ||
+      "Payment failed",
+      "error"
+    );
+
+  } finally {
+
+    if (button) {
+      button.disabled = false;
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+   MOBILE RECHARGE
+   ========================================================= */
+
+async function rechargeMobile(event) {
+
+  event.preventDefault();
+
+
+  if (!currentUser) {
+
+    openAuthModal();
+
+    return;
+
+  }
+
+
+  const mobile =
+    $("mobileNumber")
+      .value
+      .trim();
+
+
+  const operator =
+    $("operator")
+      .value;
+
+
+  const amount =
+    Number(
+      $("rechargeAmount")
+        .value
+    );
+
+
+  if (!/^[0-9]{10}$/.test(mobile)) {
+
+    showToast(
+      "Enter a valid 10 digit mobile number",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (!operator) {
+
+    showToast(
+      "Select an operator",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (!amount || amount <= 0) {
+
+    showToast(
+      "Enter recharge amount",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  const button =
+    event.submitter ||
+    $("rechargeForm")
+      .querySelector("button[type='submit']");
+
+
+  if (button) {
+    button.disabled = true;
+  }
+
+
+  try {
+
+    /*
+      Matches your existing SQL:
+
+      recharge_mobile(
+        mobile_number,
+        mobile_operator,
+        recharge_amount
+      )
+    */
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.rpc(
+        "recharge_mobile",
+        {
+          mobile_number:
+            mobile,
+
+          mobile_operator:
+            operator,
+
+          recharge_amount:
+            amount
+        }
+      );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    console.log(
+      "recharge_mobile result:",
+      data
+    );
+
+
+    $("rechargeForm").reset();
+
+
+    showToast(
+      `Recharge of ${formatMoney(amount)} successful`,
+      "success"
+    );
+
+
+    await loadWallet();
+
+    await loadTransactions();
+
+
+  } catch (error) {
+
+    console.error(
+      "Recharge error:",
+      error
+    );
+
+
+    showToast(
+      error.message ||
+      "Recharge failed",
+      "error"
+    );
+
+  } finally {
+
+    if (button) {
+      button.disabled = false;
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+   BILL PAYMENT
+   ========================================================= */
+
+async function payBill(event) {
+
+  event.preventDefault();
+
+
+  if (!currentUser) {
+
+    openAuthModal();
+
+    return;
+
+  }
+
+
+  const billType =
+    $("billType")
+      .value;
+
+
+  const accountNumber =
+    $("billAccount")
+      .value
+      .trim();
+
+
+  const amount =
+    Number(
+      $("billAmount")
+        .value
+    );
+
+
+  if (!billType) {
+
+    showToast(
+      "Select a bill type",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (!accountNumber) {
+
+    showToast(
+      "Enter account number",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  if (!amount || amount <= 0) {
+
+    showToast(
+      "Enter a valid amount",
+      "error"
+    );
+
+    return;
+
+  }
+
+
+  const button =
+    event.submitter ||
+    $("billForm")
+      .querySelector("button[type='submit']");
+
+
+  if (button) {
+    button.disabled = true;
+  }
+
+
+  try {
+
+    /*
+      Matches your existing SQL:
+
+      pay_bill(
+        payment_bill_type,
+        payment_account_number,
+        payment_amount
+      )
+    */
+
+    const {
+      data,
+      error
+    } =
+      await supabaseClient.rpc(
+        "pay_bill",
+        {
+          payment_bill_type:
+            billType,
+
+          payment_account_number:
+            accountNumber,
+
+          payment_amount:
+            amount
+        }
+      );
+
+
+    if (error) {
+      throw error;
+    }
+
+
+    console.log(
+      "pay_bill result:",
+      data
+    );
+
+
+    $("billForm").reset();
+
+
+    $("billFormWrap")
+      .classList.add("hidden");
+
+
+    showToast(
+      `${billType} bill paid successfully`,
+      "success"
+    );
+
+
+    await loadWallet();
+
+    await loadTransactions();
+
+
+  } catch (error) {
+
+    console.error(
+      "Bill payment error:",
+      error
+    );
+
+
+    showToast(
+      error.message ||
+      "Bill payment failed",
+      "error"
+    );
+
+  } finally {
+
+    if (button) {
+      button.disabled = false;
+    }
+
+  }
+
+}
+
+
+/* =========================================================
+   BILL SELECTION
+   ========================================================= */
+
+function selectBill(type) {
+
+  if (!currentUser) {
+
+    openAuthModal();
+
+    return;
+
+  }
+
+
+  $("billType").value =
+    type;
+
+
+  $("billTitle").textContent =
+    `Pay ${type} Bill`;
+
+
+  $("billFormWrap")
+    .classList.remove("hidden");
+
+
+  $("billFormWrap")
+    .scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+
+}
+
+
+/* =========================================================
+   LOAD COMPLETE APP
+   ========================================================= */
+
+async function loadApp() {
+
+  if (!currentUser) {
+
+    hideApp();
+
+    openAuthModal();
+
+    return;
+
+  }
+
+
+  showApp();
+
+
+  /*
+    Load separately so one failure
+    doesn't prevent everything else.
+  */
+
+  try {
+
+    await loadProfile();
+
+  } catch (error) {
+
+    console.error(
+      "Profile load failed:",
+      error
+    );
+
+  }
+
+
+  try {
+
+    await loadWallet();
+
+  } catch (error) {
+
+    console.error(
+      "Wallet load failed:",
+      error
+    );
+
+  }
+
+
+  try {
+
+    await loadTransactions();
+
+  } catch (error) {
+
+    console.error(
+      "Transactions load failed:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   INITIAL SESSION
+   ========================================================= */
+
+async function initialize() {
+
+  /*
+    Always hide the dashboard first.
+
+    This prevents profile information from
+    appearing before authentication is checked.
+  */
+
+  hideApp();
+
+
+  try {
+
+    const {
+      data: {
+        session
+      }
+    } =
+      await supabaseClient.auth.getSession();
+
+
+    if (session?.user) {
+
+      currentUser =
+        session.user;
+
+
+      showApp();
+
+      closeAuthModal();
+
+      await loadApp();
+
+
+    } else {
+
+      currentUser = null;
+
+      profile = null;
+
+      wallet = null;
+
+      transactions = [];
+
+      hideApp();
+
+      openAuthModal();
+
+    }
+
+
+  } catch (error) {
+
+    console.error(
+      "Session initialization error:",
+      error
+    );
+
+
+    currentUser = null;
+
+    hideApp();
+
+    openAuthModal();
+
+
+    showToast(
+      "Please sign in to continue",
+      "error"
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   EVENT LISTENERS
+   ========================================================= */
+
+
+/* Navigation */
+
+document
+  .querySelectorAll(".nav-item")
+  .forEach(button => {
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        showPage(
+          button.dataset.page
+        );
+
+      }
+    );
+
+  });
+
+
+/* View All */
+
+document
+  .querySelectorAll("[data-page-target]")
+  .forEach(button => {
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        showPage(
+          button.dataset.pageTarget
+        );
+
+      }
+    );
+
+  });
+
+
+/* Mobile menu */
+
+const mobileMenuButton =
+  document.querySelector(".menu-button");
+
+
+if (mobileMenuButton) {
+
+  mobileMenuButton.addEventListener(
+    "click",
+    () => {
+
+      if (!currentUser) {
+
+        openAuthModal();
+
+        return;
+
+      }
+
+
+      if (
+        sidebar.classList.contains("open")
+      ) {
+
+        closeMobileMenu();
+
+      } else {
+
+        openMobileMenu();
+
+      }
+
+    }
+  );
+
+}
+
+
+/* Mobile overlay */
+
+const mobileOverlay =
+  document.querySelector(".mobile-overlay");
+
+
+if (mobileOverlay) {
+
+  mobileOverlay.addEventListener(
+    "click",
+    closeMobileMenu
+  );
+
+}
+
+
+/* Refresh */
+
+if ($("refreshBtn")) {
+
+  $("refreshBtn")
+    .addEventListener(
+      "click",
+      async () => {
+
+        if (!currentUser) {
+
+          openAuthModal();
+
+          return;
 
         }
+
+
+        showToast(
+          "Refreshing..."
+        );
+
+
+        await loadApp();
+
+
+        showToast(
+          "Data refreshed",
+          "success"
+        );
+
+      }
     );
 
 }
 
 
-// =========================================================
-// 30. PAGE START
-// =========================================================
+/* Logout */
 
-document.addEventListener(
-    "DOMContentLoaded",
-    async () => {
+if ($("logoutBtn")) {
 
-        setupNavigation();
+  $("logoutBtn")
+    .addEventListener(
+      "click",
+      logout
+    );
 
-
-        // PAYMENT FORM
-
-        if ($("paymentForm")) {
-
-            $("paymentForm")
-                .addEventListener(
-                    "submit",
-                    sendMoney
-                );
-
-        }
+}
 
 
-        // RECHARGE FORM
+/* Authentication form */
 
-        if ($("rechargeForm")) {
+if ($("authForm")) {
 
-            $("rechargeForm")
-                .addEventListener(
-                    "submit",
-                    recharge
-                );
+  $("authForm")
+    .addEventListener(
+      "submit",
+      handleAuth
+    );
 
-        }
-
-
-        // BILL FORM
-
-        if ($("billForm")) {
-
-            $("billForm")
-                .addEventListener(
-                    "submit",
-                    payBill
-                );
-
-        }
+}
 
 
-        // SIGN OUT
+/* Auth mode toggle */
 
-        if ($("signOutBtn")) {
+if ($("authToggle")) {
 
-            $("signOutBtn")
-                .addEventListener(
-                    "click",
-                    signOut
-                );
+  $("authToggle")
+    .addEventListener(
+      "click",
+      () => {
 
-        }
-
-
-        // AUTH CLOSE
-
-        if ($("authClose")) {
-
-            $("authClose")
-                .addEventListener(
-                    "click",
-                    () =>
-                        $("authModal")
-                            .classList
-                            .add("hidden")
-                );
-
-        }
-
-
-        // AUTH MODE
-
-        if ($("authModeBtn")) {
-
-            $("authModeBtn")
-                .addEventListener(
-                    "click",
-                    () => {
-
-                        const current =
-                            $("authForm")
-                                .dataset
-                                .mode ||
-                            "login";
-
-                        openAuth(
-                            current === "login"
-                                ? "signup"
-                                : "login"
-                        );
-
-                    }
-                );
-
-        }
-
-
-        // AUTH SUBMIT
-
-        if ($("authForm")) {
-
-            $("authForm")
-                .addEventListener(
-                    "submit",
-                    submitAuth
-                );
-
-        }
-
-
-        // INITIAL RENDER
-
-        renderProfile();
-
-        setBalance(
-            walletBalance
+        setAuthMode(
+          authMode === "signin"
+            ? "signup"
+            : "signin"
         );
 
-        renderTransactions();
+      }
+    );
 
-        renderChart();
+}
 
 
-        // START SUPABASE
+/*
+  IMPORTANT:
+  X cannot expose the dashboard when logged out.
+*/
 
-        await initAuth();
+if ($("closeAuth")) {
 
-    }
+  $("closeAuth")
+    .addEventListener(
+      "click",
+      () => {
+
+        if (!currentUser) {
+
+          showToast(
+            "Please sign in to continue",
+            "error"
+          );
+
+          openAuthModal();
+
+          return;
+
+        }
+
+
+        closeAuthModal();
+
+      }
+    );
+
+}
+
+
+/* Send money */
+
+if ($("sendForm")) {
+
+  $("sendForm")
+    .addEventListener(
+      "submit",
+      sendMoney
+    );
+
+}
+
+
+/* Recharge */
+
+if ($("rechargeForm")) {
+
+  $("rechargeForm")
+    .addEventListener(
+      "submit",
+      rechargeMobile
+    );
+
+}
+
+
+/* Quick recharge amounts */
+
+document
+  .querySelectorAll("[data-recharge-amount]")
+  .forEach(button => {
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        if ($("rechargeAmount")) {
+
+          $("rechargeAmount").value =
+            button.dataset.rechargeAmount;
+
+        }
+
+      }
+    );
+
+  });
+
+
+/* Bill payment */
+
+if ($("billForm")) {
+
+  $("billForm")
+    .addEventListener(
+      "submit",
+      payBill
+    );
+
+}
+
+
+/* Bill cards */
+
+document
+  .querySelectorAll(".bill-card")
+  .forEach(button => {
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        selectBill(
+          button.dataset.bill
+        );
+
+      }
+    );
+
+  });
+
+
+/* Transaction search */
+
+if ($("searchInput")) {
+
+  $("searchInput")
+    .addEventListener(
+      "input",
+      renderAllTransactions
+    );
+
+}
+
+
+/* Status filter */
+
+if ($("statusFilter")) {
+
+  $("statusFilter")
+    .addEventListener(
+      "change",
+      renderAllTransactions
+    );
+
+}
+
+
+/* Type filter */
+
+if ($("typeFilter")) {
+
+  $("typeFilter")
+    .addEventListener(
+      "change",
+      renderAllTransactions
+    );
+
+}
+
+
+/* =========================================================
+   SUPABASE AUTH STATE
+   ========================================================= */
+
+supabaseClient.auth.onAuthStateChange(
+  (event, session) => {
+
+    /*
+      Do not perform heavy Supabase queries
+      directly inside this callback.
+    */
+
+    setTimeout(async () => {
+
+      if (
+        event === "SIGNED_IN" &&
+        session?.user
+      ) {
+
+        currentUser =
+          session.user;
+
+
+        showApp();
+
+        closeAuthModal();
+
+
+        await loadApp();
+
+      }
+
+
+      if (
+        event === "SIGNED_OUT"
+      ) {
+
+        currentUser = null;
+
+        profile = null;
+
+        wallet = null;
+
+        transactions = [];
+
+
+        hideApp();
+
+        openAuthModal();
+
+      }
+
+    }, 0);
+
+  }
 );
+
+
+/* =========================================================
+   START APPLICATION
+   ========================================================= */
+
+setAuthMode("signin");
+
+hideApp();
+
+initialize();
